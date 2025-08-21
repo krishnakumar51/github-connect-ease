@@ -29,56 +29,84 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
       return;
     }
 
-    // Set canvas dimensions to match video
-    const videoWidth = video.videoWidth || video.clientWidth || 640;
-    const videoHeight = video.videoHeight || video.clientHeight || 480;
-    
-    canvas.width = videoWidth;
-    canvas.height = videoHeight;
-
-    // Clear previous drawings
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    console.log(`🎨 Drawing ${detections.length} detections on ${canvas.width}x${canvas.height} canvas`);
-
-    // Draw detection boxes
-    detections.forEach((detection, index) => {
-      const { xmin, ymin, xmax, ymax, label, score } = detection;
+    // Wait for video to load before getting dimensions
+    const updateCanvas = () => {
+      const videoWidth = video.videoWidth || video.clientWidth || 640;
+      const videoHeight = video.videoHeight || video.clientHeight || 480;
       
-      // Convert normalized coordinates to pixel coordinates
-      const x = xmin * canvas.width;
-      const y = ymin * canvas.height;
-      const width = (xmax - xmin) * canvas.width;
-      const height = (ymax - ymin) * canvas.height;
+      // Set canvas resolution to match video
+      canvas.width = videoWidth;
+      canvas.height = videoHeight;
+      
+      // Set canvas display size to match container
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
 
-      console.log(`📦 Detection ${index}: ${label} at (${x.toFixed(1)}, ${y.toFixed(1)}) size ${width.toFixed(1)}x${height.toFixed(1)}`);
+      // Clear previous drawings
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Box styling - bright and visible
-      ctx.strokeStyle = '#00ff00'; // Bright green for visibility
-      ctx.lineWidth = 3;
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)'; // Semi-transparent green
+      console.log(`🎨 Drawing ${detections.length} detections on ${canvas.width}x${canvas.height} canvas`);
 
-      // Draw bounding box
-      ctx.fillRect(x, y, width, height);
-      ctx.strokeRect(x, y, width, height);
+      // Draw detection boxes
+      detections.forEach((detection, index) => {
+        const { xmin, ymin, xmax, ymax, label, score } = detection;
+        
+        // Convert normalized coordinates to pixel coordinates
+        const x = xmin * canvas.width;
+        const y = ymin * canvas.height;
+        const width = (xmax - xmin) * canvas.width;
+        const height = (ymax - ymin) * canvas.height;
 
-      // Label background
-      const labelText = `${label} ${(score * 100).toFixed(1)}%`;
-      ctx.font = '14px Inter, system-ui, sans-serif';
-      const textMetrics = ctx.measureText(labelText);
-      const labelWidth = textMetrics.width + 12;
-      const labelHeight = 24;
+        console.log(`📦 Detection ${index}: ${label} at (${x.toFixed(1)}, ${y.toFixed(1)}) size ${width.toFixed(1)}x${height.toFixed(1)}`);
 
-      // Label background - bright and visible
-      ctx.fillStyle = '#00ff00'; // Bright green background
-      ctx.fillRect(x, y - labelHeight, labelWidth, labelHeight);
+        // Box styling - bright and visible
+        ctx.strokeStyle = '#00ff00'; // Bright green for visibility
+        ctx.lineWidth = 4;
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.15)'; // Semi-transparent green
 
-      // Label text - high contrast black text
-      ctx.fillStyle = '#000000'; // Black text on green background
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(labelText, x + 6, y - labelHeight / 2);
-    });
+        // Draw bounding box
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeRect(x, y, width, height);
+
+        // Label background
+        const labelText = `${label} ${(score * 100).toFixed(1)}%`;
+        ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+        const textMetrics = ctx.measureText(labelText);
+        const labelWidth = textMetrics.width + 16;
+        const labelHeight = 28;
+
+        // Label background - bright and visible
+        ctx.fillStyle = '#00ff00'; // Bright green background
+        ctx.fillRect(x, Math.max(0, y - labelHeight), labelWidth, labelHeight);
+
+        // Label text - high contrast black text
+        ctx.fillStyle = '#000000'; // Black text on green background
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, x + 8, Math.max(14, y - labelHeight / 2));
+      });
+    };
+
+    // Update immediately if video has dimensions
+    if (video.videoWidth && video.videoHeight) {
+      updateCanvas();
+    }
+
+    // Also listen for video metadata changes
+    const handleLoadedMetadata = () => {
+      console.log('📺 Video metadata loaded, updating canvas dimensions');
+      updateCanvas();
+    };
+
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    
+    // Force update after a short delay for fallback
+    const timeoutId = setTimeout(updateCanvas, 100);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      clearTimeout(timeoutId);
+    };
   }, [detections, videoRef]);
 
   return (
