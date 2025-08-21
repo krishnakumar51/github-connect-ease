@@ -143,15 +143,16 @@ export const useObjectDetection = (mode: DetectionMode) => {
   // Always show test detections when processing starts
   useEffect(() => {
     if (isProcessing) {
+      console.log('🚀 Starting object detection processing...');
       // Show test bounding boxes immediately
       const testDetections: Detection[] = [
         {
           label: 'person',
           score: 0.93,
-          xmin: 0.1,
+          xmin: 0.2,
           ymin: 0.1,
-          xmax: 0.4,
-          ymax: 0.7,
+          xmax: 0.8,
+          ymax: 0.9,
           frame_id: Date.now(),
           capture_ts: Date.now(),
           recv_ts: Date.now() + 10,
@@ -160,32 +161,22 @@ export const useObjectDetection = (mode: DetectionMode) => {
         {
           label: 'phone',
           score: 0.87,
-          xmin: 0.5,
-          ymin: 0.2,
-          xmax: 0.7,
-          ymax: 0.5,
+          xmin: 0.1,
+          ymin: 0.3,
+          xmax: 0.3,
+          ymax: 0.6,
           frame_id: Date.now() + 1,
           capture_ts: Date.now(),
           recv_ts: Date.now() + 8,
           inference_ts: Date.now() + 20
-        },
-        {
-          label: 'bottle',
-          score: 0.76,
-          xmin: 0.75,
-          ymin: 0.3,
-          xmax: 0.9,
-          ymax: 0.8,
-          frame_id: Date.now() + 2,
-          capture_ts: Date.now(),
-          recv_ts: Date.now() + 12,
-          inference_ts: Date.now() + 30
         }
       ];
 
       setDetections(testDetections);
       console.log('✅ Test bounding boxes set:', testDetections);
+      console.log('📊 Detection count:', testDetections.length);
     } else {
+      console.log('🛑 Stopping object detection...');
       setDetections([]);
     }
   }, [isProcessing]);

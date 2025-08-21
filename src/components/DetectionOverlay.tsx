@@ -112,11 +112,14 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   return (
     <canvas
       ref={overlayCanvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-none"
+      className="absolute inset-0 w-full h-full pointer-events-none z-10"
       style={{
         width: '100%',
         height: '100%',
-        objectFit: 'cover'
+        objectFit: 'cover',
+        position: 'absolute',
+        top: 0,
+        left: 0
       }}
     />
   );
