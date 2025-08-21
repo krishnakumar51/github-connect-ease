@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3001:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - MODE=${MODE:-wasm}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - webrtc-net
+
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODEL_PATH=/app/models/yolov8n.onnx
+    volumes:
+      - ./backend/models:/app/models
+    networks:
+      - webrtc-net
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_ADMIN
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Optional: STUN/TURN server for WebRTC
+  coturn:
+    image: coturn/coturn:4.6.2
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "49152-65535:49152-65535/udp"
+    command: |
+      -n --log-file=stdout
+      --listening-port=3478
+      --relay-device=eth0
+      --min-port=49152
+      --max-port=65535
+      --lt-cred-mech --fingerprint
+      --no-multicast-peers --no-cli
+      --no-tlsv1 --no-tlsv1_1
+      --realm=localhost
+    networks:
+      - webrtc-net
+    profiles:
+      - turn-server
+
+networks:
+  webrtc-net:
+    driver: bridge
