@@ -22,11 +22,13 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
   onDisconnect
 }) => {
   const [copied, setCopied] = useState(false);
+  const [overrideUrl, setOverrideUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(connectionUrl);
+      const toCopy = overrideUrl ?? connectionUrl;
+      await navigator.clipboard.writeText(toCopy);
       setCopied(true);
       toast({
         title: "URL Copied",
@@ -39,6 +41,25 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
         description: "Failed to copy URL to clipboard",
         variant: "destructive"
       });
+    }
+  };
+
+  const viteApi = (import.meta as any)?.env?.VITE_API_URL;
+  // compute display URL: prefer override -> viteApi -> provided connectionUrl
+  const computedUrl = overrideUrl ?? (viteApi ? `${viteApi.replace(/\/$/, '')}/phone` : connectionUrl);
+
+  const handleUseNetworkIP = async () => {
+    const ip = prompt('Enter your machine LAN IP (e.g. 192.168.1.3)');
+    if (ip) {
+      try {
+        // replace localhost or 127.0.0.1 in the provided connectionUrl
+        const replaced = connectionUrl.replace(/localhost|127\.0\.0\.1/, ip);
+        setOverrideUrl(replaced);
+        toast({ title: 'Using network IP', description: replaced });
+      } catch (err) {
+        // fallback
+        setOverrideUrl(`${window.location.protocol}//${ip}/phone`);
+      }
     }
   };
 
@@ -76,7 +97,7 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           </label>
           <div className="flex gap-2">
             <Input 
-              value={connectionUrl}
+              value={computedUrl}
               readOnly
               className="flex-1 font-mono text-sm"
             />
@@ -91,6 +112,14 @@ export const ConnectionPanel: React.FC<ConnectionPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Quick network helper when connectionUrl contains localhost */}
+      {/(localhost|127\.0\.0\.1)/.test(connectionUrl) && (
+        <div className="flex gap-2 mb-4">
+          <Button onClick={handleUseNetworkIP} size="sm">Use network IP</Button>
+          <Button onClick={() => setOverrideUrl(null)} variant="ghost" size="sm">Reset</Button>
+        </div>
+      )}
 
       {/* Instructions */}
       <div className="space-y-4 mb-6 p-4 bg-muted rounded-lg">

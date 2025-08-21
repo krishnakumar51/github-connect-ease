@@ -15,8 +15,9 @@ const Phone = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { toast } = useToast();
   
-  // Use object detection hook with WASM mode for phone
-  const { detections, isProcessing, startDetection, stopDetection } = useObjectDetection('wasm');
+  // Prefer server mode if a backend URL is provided (Vite env)
+  const preferredMode = ((import.meta as any)?.env?.VITE_API_URL) ? 'server' : 'wasm';
+  const { detections, isProcessing, startDetection, stopDetection } = useObjectDetection(preferredMode as any);
 
   const startCamera = async () => {
     try {
@@ -225,8 +226,8 @@ const Phone = () => {
             <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
               <CameraOff className="w-12 h-12 mb-4" />
               <p className="text-lg font-medium mb-2">Camera Stopped</p>
-              <p className="text-sm text-center px-4">
-                Tap "Start Camera" below to begin streaming
+                <p className="text-sm text-center px-4">
+                Tap "Start Camera" below to begin streaming — using {preferredMode.toUpperCase()} inference
               </p>
             </div>
           )}

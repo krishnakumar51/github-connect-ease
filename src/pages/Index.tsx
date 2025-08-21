@@ -44,7 +44,15 @@ const Index = () => {
   } = useMetrics();
 
   useEffect(() => {
-    // Generate connection URL and QR code with current domain
+    // Prefer build-time Vite API URL (ngrok or network) so QR/code uses reachable network URL
+    const viteApi = (import.meta as any)?.env?.VITE_API_URL;
+    if (viteApi) {
+      const normalized = viteApi.replace(/\/$/, '');
+      setConnectionUrl(`${normalized}/phone`);
+      return;
+    }
+
+    // Fallback to current host
     const currentHost = window.location.host;
     const protocol = window.location.protocol;
     const url = `${protocol}//${currentHost}/phone`;
@@ -53,8 +61,9 @@ const Index = () => {
 
   const handleStartSession = useCallback(async () => {
     try {
-      await connect();
-      await startDetection(remoteStream || localStream);
+  const stream = await connect();
+  // Use returned stream directly to avoid race where localStream/remoteStream is not set yet
+  await startDetection(stream);
       setIsRecording(true);
       startBenchmark();
     } catch (error) {

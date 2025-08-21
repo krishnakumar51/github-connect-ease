@@ -24,7 +24,8 @@ export const useObjectDetection = (mode: DetectionMode) => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const sessionRef = useRef<ort.InferenceSession | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   // Initialize ONNX model for WASM mode
   useEffect(() => {
@@ -209,17 +210,35 @@ export const useObjectDetection = (mode: DetectionMode) => {
         generateMockDetections();
       }
     } else if (mode === 'server') {
-      // Server-side detection (existing code)
+      // Server-side detection (WebSocket primary, HTTP fallback)
       try {
-        const blob = await new Promise<Blob>(resolve => 
-          canvas.toBlob(resolve as BlobCallback, 'image/jpeg', 0.8)
+        const blob = await new Promise<Blob | null>(resolve => 
+          canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.8)
         );
-        
+
+        if (!blob) {
+          console.warn('Failed to create blob for server detection');
+          return;
+        }
+
+        // Try WebSocket first
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          try {
+            ws.send(blob as any);
+            return; // server will push detections via ws.onmessage
+          } catch (wsErr) {
+            console.warn('WebSocket send failed, falling back to HTTP POST', wsErr);
+          }
+        }
+
+        // Fallback: HTTP POST to /api/detect
         const formData = new FormData();
         formData.append('image', blob);
         formData.append('timestamp', Date.now().toString());
 
-        const response = await fetch('http://localhost:8000/api/detect', {
+  const apiUrl = ((import.meta as any)?.env?.VITE_API_URL) ?? 'http://localhost:8000';
+        const response = await fetch(`${apiUrl.replace(/\/$/, '')}/api/detect`, {
           method: 'POST',
           body: formData
         });
@@ -227,9 +246,9 @@ export const useObjectDetection = (mode: DetectionMode) => {
         if (response.ok) {
           const result = await response.json();
           setDetections(result.detections || []);
-          console.log(`Server detection completed with ${result.detections?.length || 0} objects`);
+          console.log(`Server detection (HTTP) completed with ${result.detections?.length || 0} objects`);
         } else {
-          console.error('Server detection failed with status:', response.status);
+          console.error('Server detection (HTTP) failed with status:', response.status);
           generateMockDetections();
         }
       } catch (error) {
@@ -293,8 +312,54 @@ export const useObjectDetection = (mode: DetectionMode) => {
       video.onloadedmetadata = resolve;
     });
 
-    // Generate initial detections immediately
-    generateMockDetections();
+  // Do not generate initial mock detections here; wait for real inference or server results
+
+    // If server mode, establish WebSocket connection for low-latency streaming
+    if (mode === 'server') {
+      try {
+  const apiUrl = ((import.meta as any)?.env?.VITE_API_URL) ?? `${window.location.protocol}//${window.location.host}`;
+        const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
+        const base = apiUrl.replace(/^https?:\/\//, '');
+        const wsUrl = `${wsProtocol}://${base.replace(/\/$/, '')}/ws/detect`;
+
+        // Close previous ws if any
+        if (wsRef.current) {
+          try { wsRef.current.close(); } catch {};
+          wsRef.current = null;
+        }
+
+        const ws = new WebSocket(wsUrl);
+        ws.binaryType = 'arraybuffer';
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log('✅ WebSocket connected for server detection:', wsUrl);
+        };
+
+        ws.onmessage = (ev) => {
+          try {
+            const data = typeof ev.data === 'string' ? JSON.parse(ev.data) : null;
+            if (data && data.detections) {
+              setDetections(data.detections);
+            }
+          } catch (err) {
+            console.error('Failed to parse WS message:', err);
+          }
+        };
+
+        ws.onclose = () => {
+          console.log('WebSocket closed');
+          wsRef.current = null;
+        };
+
+        ws.onerror = (err) => {
+          console.error('WebSocket error:', err);
+        };
+
+      } catch (err) {
+        console.error('Failed to create WebSocket for server detection:', err);
+      }
+    }
 
     // Process frames at 10 FPS for efficiency
     intervalRef.current = setInterval(() => {
@@ -313,6 +378,11 @@ export const useObjectDetection = (mode: DetectionMode) => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
+    }
+
+    if (wsRef.current) {
+      try { wsRef.current.close(); } catch {};
+      wsRef.current = null;
     }
   }, []);
 
