@@ -1,11 +1,28 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Detection } from '@/types/detection';
+
+// YOLOv13-inspired color palette for detections
+const DETECTION_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3', '#54A0FF',
+  '#5F27CD', '#00D2D3', '#FF9F43', '#10AC84', '#EE5A24', '#0ABDE3', '#C44569',
+  '#F8B500', '#6C5CE7', '#A55EEA', '#26D0CE', '#FD79A8', '#E17055', '#81ECEC',
+  '#74B9FF', '#0984E3', '#B2BEC3', '#DDD', '#636E72', '#2D3436'
+];
 
 interface DetectionOverlayProps {
   detections: Detection[];
   videoRef: React.RefObject<HTMLVideoElement>;
   canvasRef: React.RefObject<HTMLCanvasElement>;
 }
+
+// Hash function for consistent color assignment based on class name
+const getColorForClass = (className: string): string => {
+  let hash = 0;
+  for (let i = 0; i < className.length; i++) {
+    hash = className.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return DETECTION_COLORS[Math.abs(hash) % DETECTION_COLORS.length];
+};
 
 export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
   detections,
@@ -47,7 +64,7 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
 
       console.log(`🎨 Drawing ${detections.length} detections on ${canvas.width}x${canvas.height} canvas`);
 
-      // Draw detection boxes
+      // Draw detections with YOLOv13-style visualization
       detections.forEach((detection, index) => {
         const { xmin, ymin, xmax, ymax, label, score } = detection;
         
@@ -59,31 +76,65 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
 
         console.log(`📦 Detection ${index}: ${label} at (${x.toFixed(1)}, ${y.toFixed(1)}) size ${width.toFixed(1)}x${height.toFixed(1)}`);
 
-        // Box styling - bright and visible
-        ctx.strokeStyle = '#00ff00'; // Bright green for visibility
-        ctx.lineWidth = 4;
-        ctx.fillStyle = 'rgba(0, 255, 0, 0.15)'; // Semi-transparent green
+        // Get consistent color for this class
+        const color = getColorForClass(label);
+        
+        // Convert hex to RGB for alpha blending
+        const hexToRgb = (hex: string) => {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+          } : { r: 0, g: 255, b: 0 };
+        };
+        
+        const rgb = hexToRgb(color);
 
-        // Draw bounding box
+        // Draw filled background with low opacity
+        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`;
         ctx.fillRect(x, y, width, height);
+
+        // Draw border with higher opacity
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
         ctx.strokeRect(x, y, width, height);
 
-        // Label background
+        // Prepare label text
         const labelText = `${label} ${(score * 100).toFixed(1)}%`;
-        ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+        ctx.font = 'bold 14px Inter, system-ui, sans-serif';
+        
+        // Measure text for background
         const textMetrics = ctx.measureText(labelText);
-        const labelWidth = textMetrics.width + 16;
-        const labelHeight = 28;
+        const textWidth = textMetrics.width;
+        const textHeight = 16;
+        const padding = 8;
+        
+        // Calculate label position (above the box, or below if near top)
+        const labelY = y > textHeight + padding ? y - padding : y + height + textHeight + padding;
+        const labelX = x;
 
-        // Label background - bright and visible
-        ctx.fillStyle = '#00ff00'; // Bright green background
-        ctx.fillRect(x, Math.max(0, y - labelHeight), labelWidth, labelHeight);
+        // Draw label background
+        ctx.fillStyle = color;
+        ctx.fillRect(labelX, labelY - textHeight, textWidth + padding * 2, textHeight + padding);
 
-        // Label text - high contrast black text
-        ctx.fillStyle = '#000000'; // Black text on green background
+        // Draw label text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 14px Inter, system-ui, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(labelText, x + 8, Math.max(14, y - labelHeight / 2));
+        ctx.fillText(labelText, labelX + padding, labelY - textHeight/2);
+
+        // Draw confidence indicator (small filled circle)
+        const confidence = score;
+        const indicatorSize = 8;
+        const indicatorX = x + width - indicatorSize - 6;
+        const indicatorY = y + 6;
+        
+        ctx.beginPath();
+        ctx.arc(indicatorX, indicatorY + indicatorSize/2, indicatorSize/2, 0, 2 * Math.PI);
+        ctx.fillStyle = confidence > 0.8 ? '#00FF00' : confidence > 0.6 ? '#FFA500' : '#FF4444';
+        ctx.fill();
       });
     };
 

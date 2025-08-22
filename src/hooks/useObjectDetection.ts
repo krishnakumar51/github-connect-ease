@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Detection, DetectionMode } from '@/types/detection';
 import * as ort from 'onnxruntime-web';
 
-// COCO class names for YOLO models
+// COCO class names for YOLO models (80 classes)
 const COCO_CLASSES = [
   'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',
   'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
@@ -16,6 +16,14 @@ const COCO_CLASSES = [
   'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
   'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
   'toothbrush'
+];
+
+// YOLOv13-inspired color palette for detections
+const DETECTION_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3', '#54A0FF',
+  '#5F27CD', '#00D2D3', '#FF9F43', '#10AC84', '#EE5A24', '#0ABDE3', '#C44569',
+  '#F8B500', '#6C5CE7', '#A55EEA', '#26D0CE', '#FD79A8', '#E17055', '#81ECEC',
+  '#74B9FF', '#0984E3', '#B2BEC3', '#DDD', '#636E72', '#2D3436'
 ];
 
 export const useObjectDetection = (mode: DetectionMode) => {
@@ -262,14 +270,15 @@ export const useObjectDetection = (mode: DetectionMode) => {
   }, [mode, isProcessing, isModelLoaded, preprocessImage, postprocessDetections]);
 
   const generateMockDetections = useCallback(() => {
+    // Generate YOLOv13-style realistic mock detections with variety
     const mockDetections: Detection[] = [
       {
         label: 'person',
         score: 0.89 + Math.random() * 0.1,
-        xmin: 0.1 + Math.random() * 0.1,
-        ymin: 0.1 + Math.random() * 0.1,
-        xmax: 0.6 + Math.random() * 0.2,
-        ymax: 0.9 + Math.random() * 0.1,
+        xmin: 0.15,
+        ymin: 0.05,
+        xmax: 0.45,
+        ymax: 0.85,
         frame_id: Date.now(),
         capture_ts: Date.now(),
         recv_ts: Date.now() + 5,
@@ -278,18 +287,54 @@ export const useObjectDetection = (mode: DetectionMode) => {
       {
         label: 'cell phone',
         score: 0.76 + Math.random() * 0.15,
-        xmin: 0.7 + Math.random() * 0.1,
-        ymin: 0.2 + Math.random() * 0.1,
-        xmax: 0.9 + Math.random() * 0.05,
-        ymax: 0.5 + Math.random() * 0.1,
+        xmin: 0.55,
+        ymin: 0.25,
+        xmax: 0.75,
+        ymax: 0.55,
         frame_id: Date.now() + 1,
         capture_ts: Date.now(),
         recv_ts: Date.now() + 8,
         inference_ts: Date.now() + 30
+      },
+      {
+        label: 'book',
+        score: 0.82 + Math.random() * 0.1,
+        xmin: 0.1,
+        ymin: 0.6,
+        xmax: 0.35,
+        ymax: 0.9,
+        frame_id: Date.now() + 2,
+        capture_ts: Date.now(),
+        recv_ts: Date.now() + 6,
+        inference_ts: Date.now() + 28
+      },
+      {
+        label: 'cup',
+        score: 0.68 + Math.random() * 0.15,
+        xmin: 0.7,
+        ymin: 0.1,
+        xmax: 0.9,
+        ymax: 0.4,
+        frame_id: Date.now() + 3,
+        capture_ts: Date.now(),
+        recv_ts: Date.now() + 7,
+        inference_ts: Date.now() + 32
+      },
+      {
+        label: 'laptop',
+        score: 0.92 + Math.random() * 0.05,
+        xmin: 0.3,
+        ymin: 0.4,
+        xmax: 0.8,
+        ymax: 0.75,
+        frame_id: Date.now() + 4,
+        capture_ts: Date.now(),
+        recv_ts: Date.now() + 4,
+        inference_ts: Date.now() + 22
       }
     ];
     setDetections(mockDetections);
-    console.log(`🎭 Mock detection generated ${mockDetections.length} objects`);
+    console.log(`🎭 YOLOv13-style mock detection generated ${mockDetections.length} objects`);
   }, []);
 
   const startDetection = useCallback(async (stream: MediaStream | null) => {
