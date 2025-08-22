@@ -61,9 +61,9 @@ const Index = () => {
 
   const handleStartSession = useCallback(async () => {
     try {
-  const stream = await connect();
-  // Use returned stream directly to avoid race where localStream/remoteStream is not set yet
-  await startDetection(stream);
+      await connect();
+      // Use localStream after connection is established
+      await startDetection(localStream);
       setIsRecording(true);
       startBenchmark();
     } catch (error) {

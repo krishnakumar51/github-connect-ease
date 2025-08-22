@@ -361,8 +361,11 @@ export const useObjectDetection = (mode: DetectionMode) => {
       }
     }
 
+    // Generate immediate mock detections
+    generateMockDetections();
+
     // Process frames at 10 FPS for efficiency
-    intervalRef.current = setInterval(() => {
+    intervalRef.current = window.setInterval(() => {
       processFrame(video);
     }, 1000 / 10);
 

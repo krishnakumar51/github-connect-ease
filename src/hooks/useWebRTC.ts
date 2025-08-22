@@ -47,7 +47,7 @@ export const useWebRTC = () => {
     return pc;
   }, []);
 
-  const connect = useCallback(async (): Promise<MediaStream> => {
+  const connect = useCallback(async (): Promise<void> => {
     try {
       // Get user media
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -83,7 +83,7 @@ export const useWebRTC = () => {
         console.log('WebRTC connection established (simulated)');
       }, 1000);
 
-      return stream;
+      // Stream is now available via localStream state
 
     } catch (error) {
       console.error('Failed to connect:', error);
